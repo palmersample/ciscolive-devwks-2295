@@ -1,7 +1,7 @@
 *.sql.gz
 .netbox
 .initializers
-docker-compose.override.yml
+# docker-compose.override.yml
 *.pem
 configuration/*
 !configuration/configuration.py
