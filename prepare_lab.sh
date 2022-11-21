@@ -9,7 +9,7 @@ SSH_CONFIG_FILE="scripts/ssh_config"
 
 TIMEOUT_CMD=`which timeout`
 if [ $? -eq 0 ]; then
-  TIMEOUT_CMD="${TIMEOUT_CMD} 5"
+  TIMEOUT_CMD="${TIMEOUT_CMD} 5 "
 else
   TIMEOUT_CMD=""
 fi
