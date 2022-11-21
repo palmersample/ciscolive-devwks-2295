@@ -239,7 +239,7 @@ generate_ssh_config
 echo ""
 if [ ${ERROR_COUNT} -gt 0 ]; then
   echo "THERE WERE ERRORS IN SETUP TESTING:"
-  echo "${ERROR_MESSAGES}"
+  printf "${ERROR_MESSAGES}\n"
   echo "\tPlease ask your proctor for assistance!"
 else
   echo "ALL SETUP TASKS OK - Time to have some automation fun!"
