@@ -43,13 +43,13 @@ if __name__ == "__main__":
     NETBOX_URL = os.environ.get("NETBOX_URL")
     netbox = pynetbox.api(url=NETBOX_URL, token=netbox_token)
 
-    all_devices = netbox.dcim.devices.filter(platform="iosxe",
-                                             device_role="wlc")
-
-    for device in all_devices:
+    for device in netbox.dcim.devices.filter(platform="iosxe",
+                                             device_role="router"):
         print(f"Processing device {device}...")
-        mgmt_interface = netbox.ipam.ip_addresses.get(device_name=device.name,
-                                                      mgmt_only=True)
+        mgmt_interface = netbox.dcim.interfaces.get(device=device,
+                                                    mgmt_only=True)
+
+        mgmt_interface = netbox.ipam.ip_addresses.get(interface_id=mgmt_interface.id)
 
         device_dns_hostname = mgmt_interface.dns_name
         print(f"\t- Retrieved management interface '{mgmt_interface.assigned_object.name}'")
@@ -74,14 +74,15 @@ if __name__ == "__main__":
             with netconf.locked("candidate"):
                 payload = netconf_password_template.render(username=device_username,
                                                            new_password=new_password)
-
+                netconf.edit_config(target="candidate", config=payload)
+                netconf.commit()
                 try:
                     manager.connect(host=device_dns_hostname,
                                     username=device_username,
                                     password=new_password,
                                     ssh_config="./netconf_ssh_config")
-                except ncclient.transport.errors.AuthenticationError:
-                    print("\t- Password update failed. Reverting to original...")
+                except ncclient.transport.errors.AuthenticationError as err:
+                    print(f"\t- Password update failed. Reverting to original... {err}")
                     payload = netconf_password_template.render(username=device_username,
                                                                new_password=device_password)
                     netconf.edit_config(target="candidate", config=payload)
