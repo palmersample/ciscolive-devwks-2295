@@ -118,7 +118,7 @@ test_netbox()
 test_router()
 {
   declare PROXY_HOST="proxy.${DNS_DOMAIN}"
-  declare WLC_HOST="pod${POD_NUMBER}-wlc.${DNS_DOMAIN}"
+  declare WLC_HOST="pod${POD_NUMBER}-rtr.${DNS_DOMAIN}"
   declare WLC_URL="https://${WLC_HOST}"
   # Expect an "Unauthorized" result
   RESTCONF_TARGET=401
