@@ -1,4 +1,4 @@
 jinja2
 pynetbox
-hvac
+hvac==1.0.2
 ncclient
