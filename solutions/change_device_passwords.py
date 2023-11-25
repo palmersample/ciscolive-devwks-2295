@@ -46,7 +46,7 @@ if __name__ == "__main__":
     for device in netbox.dcim.devices.filter(platform="iosxe",
                                              device_role="router"):
         print(f"Processing device {device}...")
-        mgmt_interface = netbox.dcim.interfaces.get(device=device,
+        mgmt_interface = netbox.dcim.interfaces.get(device_id=device.id,
                                                     mgmt_only=True)
 
         mgmt_interface = netbox.ipam.ip_addresses.get(interface_id=mgmt_interface.id)
