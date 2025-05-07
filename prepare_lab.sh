@@ -294,9 +294,10 @@ echo ""
 echo "TEST 4: Checking connectivity to IOSXE in Pod ${POD_NUMBER}:"
 test_router
 
-echo ""
-echo "SETUP: Restarting proxy for pyATS log server"
-restart_caddy
+# Caddy not used for this lab - commenting.
+# echo ""
+# echo "SETUP: Restarting proxy for pyATS log server"
+# restart_caddy
 
 echo ""
 echo "SETUP: Generate SSH configuration files for Pod ${POD_NUMBER}"

@@ -15,7 +15,7 @@ if __name__ == "__main__":
     netconf_password_template = template_env.get_template("change_password.xml.j2")
     print("OK")
 
-    VAULT_URL = os.environ.get("VAULT_ADDR")
+    VAULT_URL = os.environ.get("VAULT_URL")
     VAULT_TOKEN = os.environ.get("VAULT_TOKEN")
 
     secret_path = "/infra"
@@ -31,20 +31,19 @@ if __name__ == "__main__":
         path=f'{secret_path}/{device}'
     )
 
-    # print(f"\tRetrieved NetBox token from Vault: '{netbox_secret}'")
-
-    # Extract the NetBox token from the response
-    netbox_token = netbox_secret["data"]["data"]["netbox_api_token"]
+    # Extract the NetBox URL and token from the response
+    netbox_url = netbox_secret["data"]["data"]["netbox_url"]
+    netbox_token = netbox_secret["data"]["data"]["netbox_token"]
 
     print(f"{netbox_token}\n")
 
     print("*" * 78)
 
-    NETBOX_URL = os.environ.get("NETBOX_URL")
-    netbox = pynetbox.api(url=NETBOX_URL, token=netbox_token)
+    netbox = pynetbox.api(url=netbox_url, token=netbox_token)
 
     for device in netbox.dcim.devices.filter(platform="iosxe",
-                                             device_role="router"):
+                                             device_role="router",
+                                             cf_workshop_pod_number=os.environ.get("POD_NUMBER")):
         print(f"Processing device {device}...")
         mgmt_interface = netbox.dcim.interfaces.get(device_id=device.id,
                                                     mgmt_only=True)
