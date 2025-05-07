@@ -1,5 +1,23 @@
 #!/bin/bash
 
+if [ "x${DNS_DOMAIN}" = "x" ]; then
+  echo ""
+  echo "******************************************************************************"
+  echo "FATAL ERROR:"
+  echo "  DNS_DOMAIN environment variable not set, unable to proceed!"
+  echo ""
+  echo "  Ensure you completed the workshop setup task to setup the environment,"
+  echo "  or supply the DNS_DOMAIN variable when calling this script."
+  echo "******************************************************************************"
+  echo ""
+  kill -INT $$
+fi
+
+# Create a persistent env file in case of connection error to the LL2
+# environment - can restore access without workshop interruption by sourcing
+# the filename specified here.
+SAVED_ENV_FILE="./workshop-env"
+
 ERROR_COUNT=0
 ERROR_MESSAGES=""
 
@@ -16,9 +34,8 @@ fi
 
 test_proxy()
 {
-  declare PROXY_HOST="proxy.${DNS_DOMAIN}"
   printf "%40s" "Proxy status: "
-  PROXY_CONNECT_RESULT=$(echo "" | ${TIMEOUT_CMD}openssl s_client -connect ${PROXY_HOST}:443 -tls1_2 2>&1 > /dev/null)
+  PROXY_CONNECT_RESULT=$(echo "" | ${TIMEOUT_CMD}openssl s_client -connect ${PROXY_DNS_NAME}:443 -tls1_2 2>&1 > /dev/null)
   if [ $? -ne 0 ] ; then
     ERROR_COUNT=${ERROR_COUNT+1}
     ERROR_MESSAGES="${ERROR_MESSAGES}\t- Unable to contact the proxy server.\n"
@@ -91,9 +108,8 @@ test_vault()
 test_netbox()
 {
   NETBOX_UI_TARGET=200
-
   printf "%40s" "NetBox UI status: "
-  NETBOX_UI_RESULT=$(${TIMEOUT_CMD}curl -s -o /dev/null -w "%{http_code}" "${NETBOX_URL}")
+  NETBOX_UI_RESULT=$(${TIMEOUT_CMD}curl -s -o /dev/null -L -w "%{http_code}" "${NETBOX_URL}")
   if [ "x${NETBOX_UI_RESULT}" = "x${NETBOX_UI_TARGET}" ]; then
     echo "OK"
   else
@@ -104,6 +120,7 @@ test_netbox()
 
   printf "%40s" "NetBox API status: "
   NETBOX_API_RESULT=$(${TIMEOUT_CMD}curl -fsv \
+    --header "Authorization: Token ${NETBOX_TOKEN}" \
     "${NETBOX_URL}/api/status/" 2>&1)
 
   if [ $? -ne 0 ] ; then
@@ -202,18 +219,61 @@ generate_ssh_config()
 
 }
 
+restart_caddy()
+{
+  printf "%40s" "Stopping log proxy: "
+  CADDY_STOP_RESULT=$(${TIMEOUT_CMD}pkill caddy)
+  if [ $? -le 1 ]; then
+    echo "OK"
+  else
+    # Stopping and starting caddy should not be fatal errors -
+    # for this workshop, it just means the log server won't be
+    # accessible.
+    echo "FAIL (NOT CRITICAL)"
+  fi
+
+  printf "%40s" "Starting log proxy: "
+  CADDY_START_RESULT=$(${TIMEOUT_CMD}caddy start --config Caddyfile 2>/dev/null >/dev/null)
+  if [ $? -ne 0 ]; then
+    echo "FAIL (NOT CRITICAL)"
+  else
+    echo "OK"
+  fi
+}
+
 echo "GET READY FOR YOUR CISCO LIVE WORKSHOP EXPERIENCE! :)"
 echo ""
 
 echo -n "What is your pod number? "
 read POD_NUMBER
-
 POD_NUMBER=$(echo ${POD_NUMBER} | sed 's/^0*//')
 
-[ -f workshop.env ] && . ./workshop.env
+PROXY_DNS_NAME="proxy.${DNS_DOMAIN}"
+PROXY_SSH_PORT=8000
+PROXY_NETCONF_PORT=8300
 
-VAULT_URL="https://pod${POD_NUMBER}-vault.${DNS_DOMAIN}"
-NETBOX_URL="https://pod${POD_NUMBER}-netbox.${DNS_DOMAIN}"
+# [ -f workshop.env ] && . ./workshop.env
+
+#####
+# Set defaults if Vault and NetBox vars are not defined
+#
+if [ "x${VAULT_URL}" = "x" ]; then
+  VAULT_URL="https://vault.${DNS_DOMAIN}"
+fi
+
+if [ "x${VAULT_TOKEN}" = "x" ]; then
+  VAULT_TOKEN="secret-vault-token"
+fi
+
+if [ "x${NETBOX_URL}" = "x" ]; then
+  NETBOX_URL="https://netbox.${DNS_DOMAIN}"
+fi
+
+if [ "x${NETBOX_TOKEN}" = "x" ]; then
+  NETBOX_TOKEN="ba9cded0eda0f4053cfbe1e11e33b1e0e141100e"
+fi
+RTR_DNS_NAME="pod${POD_NUMBER}-rtr.${DNS_DOMAIN}"
+RTR_URL="https://${RTR_DNS_NAME}"
 
 echo ""
 echo "************************************************************************"
@@ -235,6 +295,10 @@ echo "TEST 4: Checking connectivity to IOSXE in Pod ${POD_NUMBER}:"
 test_router
 
 echo ""
+echo "SETUP: Restarting proxy for pyATS log server"
+restart_caddy
+
+echo ""
 echo "SETUP: Generate SSH configuration files for Pod ${POD_NUMBER}"
 generate_ssh_config
 
@@ -245,10 +309,19 @@ if [ ${ERROR_COUNT} -gt 0 ]; then
   echo "\tPlease ask your proctor for assistance!"
 else
   echo "ALL SETUP TASKS OK - Time to have some automation fun!"
-  export VAULT_ADDR=${VAULT_URL}
+  export POD_NUMBER=${POD_NUMBER}
+  export RTR_DNS_NAME=${RTR_DNS_NAME}
+  export PROXY_DNS_NAME=${PROXY_DNS_NAME}
+  export PROXY_SSH_PORT=${PROXY_SSH_PORT}
+  export VAULT_URL=${VAULT_URL}
   export VAULT_TOKEN=${VAULT_TOKEN}
-  export NETBOX_URL=${NETBOX_URL}
 
+  echo "export POD_NUMBER=${POD_NUMBER}" > ${SAVED_ENV_FILE}
+  echo "export DNS_DOMAIN=${DNS_DOMAIN}" >> ${SAVED_ENV_FILE}
+  echo "export VAULT_URL=${VAULT_URL}" >> ${SAVED_ENV_FILE}
+  echo "export VAULT_TOKEN=${VAULT_TOKEN}" >> ${SAVED_ENV_FILE}
+  echo "export PROXY_DNS_NAME=${PROXY_DNS_NAME}" >> ${SAVED_ENV_FILE}
+  echo "export PROXY_SSH_PORT=${PROXY_SSH_PORT}" >> ${SAVED_ENV_FILE}
 fi
 
 echo ""
